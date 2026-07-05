@@ -14,6 +14,30 @@ full-stack refresher.
 The Next.js app is scaffolded (App Router, TypeScript, no Tailwind). Supabase project and n8n instance are not
 yet set up — see the phased plan in `specs/001-automation-exercise.md` and the Stack section below.
 
+## Current status / next steps (updated 2026-07-05)
+
+Read this first when resuming work — it says exactly where things stand and what to do next.
+
+**Done (Phase 0, partial):**
+- Next.js 16 app scaffolded, builds and lints clean.
+- Git repo initialized and pushed to `https://github.com/YanivBodaga/First-Agentic-Workflow` (branch `main`).
+- Full approved plan copied into `specs/001-automation-exercise-plan.md` (also still at
+  `~/.claude/plans/goofy-swimming-crystal.md` on this machine, but the repo copy is the durable source of
+  truth).
+- Repo intentionally lives at a local path (`C:\Users\yaniv\projects\automation-exercise`), not inside a
+  cloud-synced folder — see "Project location" below for why.
+
+**Not done yet, blocking further progress:**
+1. User has a Vercel account and a Supabase account, but the Supabase project and its API keys have not been
+   captured yet (waiting on: Project URL, anon key, service_role key from Project Settings → API).
+2. `.env.local` doesn't exist yet — create it from `.env.example` once the Supabase keys above are in hand.
+3. App hasn't been deployed to Vercel yet (import the GitHub repo at vercel.com/new, or `npx vercel`) — needed
+   before Phase 1's DB trigger can be pointed at a real URL.
+4. Docker and ngrok are not installed on this machine — not needed until Phase 3, no rush.
+
+**Immediate next step**: get the 3 Supabase values from the user, write `.env.local`, deploy to Vercel, then
+start Phase 1 (`supabase/migrations/0001_users_and_execution_log.sql` per the plan doc).
+
 ## Mandatory workflow: Spec → Plan → Jira tasks → Incremental implementation
 
 This is not optional process ceremony — it's the explicit methodology this project is meant to practice. Follow
