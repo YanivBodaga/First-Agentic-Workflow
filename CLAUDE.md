@@ -106,9 +106,20 @@ Read this first when resuming work — it says exactly where things stand and wh
   stub and does not yet actually call `N8N_WEBHOOK_URL` — that wiring happens in Phase 4.
 
 **Not done yet, blocking further progress:**
-None currently.
+1. Session paused after Phase 3 (2026-07-09). Docker Desktop and/or the `ngrok http 5678` process were likely
+   stopped (machine restart, terminal closed, etc.) since then, so the old ngrok URL currently in
+   `N8N_WEBHOOK_URL` (both `.env.local` and Vercel) is almost certainly dead.
 
-**Immediate next step**: start **Phase 4** — replace the stubbed `sendToN8n` in `lib/events/dispatch.ts` with a
+**Immediate next step**: **before starting Phase 4**, refresh the local n8n + ngrok setup:
+1. Make sure Docker Desktop is running, then `docker compose --env-file n8n/.env -f n8n/docker-compose.yml up -d`
+   (the `user-created-echo` workflow persists in the `n8n_data` volume and should still be published).
+2. `ngrok http 5678`, grab the new `https://*.ngrok-free.dev` URL from its output (or `curl
+   http://127.0.0.1:4040/api/tunnels`).
+3. Update `N8N_WEBHOOK_URL` to `<new ngrok URL>/webhook/user-created` in both `.env.local` and Vercel's
+   Production environment (Project Settings → Environments → Production).
+4. Sanity-check with `curl -X POST <new ngrok URL>/webhook/user-created` → expect `{"status":"success"}`.
+
+Then start **Phase 4** — replace the stubbed `sendToN8n` in `lib/events/dispatch.ts` with a
 real implementation: `lib/webhook/sign.ts` (HMAC-SHA256 over the exact raw JSON string sent, using a
 `WEBHOOK_SIGNING_SECRET` env var — not yet set in `.env.local`/Vercel, needs generating), `lib/webhook/retry.ts`
 (retry only on network error/timeout/5xx, not on a 4xx like a bad signature), and wiring `dispatch.ts` to
