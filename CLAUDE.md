@@ -14,7 +14,7 @@ full-stack refresher.
 The Next.js app is scaffolded (App Router, TypeScript, no Tailwind). Supabase project and n8n instance are not
 yet set up — see the phased plan in `specs/001-automation-exercise.md` and the Stack section below.
 
-## Current status / next steps (updated 2026-07-06)
+## Current status / next steps (updated 2026-07-08)
 
 Read this first when resuming work — it says exactly where things stand and what to do next.
 
@@ -48,18 +48,44 @@ Read this first when resuming work — it says exactly where things stand and wh
   timeout `5000`ms. The migration file documents this in a comment instead of containing the `create trigger`
   statement.
 - `npm run build` passes clean with the new files.
-- Not yet done: committing these Phase 1 changes (migration file, `lib/supabase/admin.ts`, `package.json`/
-  `package-lock.json` for the two new deps).
+- Committed as `d636ecd "first phase"`.
+
+**Done (Phase 2, complete):**
+- `lib/events/types.ts` (`UserInsertWebhookPayload`, `UserCreatedEvent` — the user's row `id` doubles as the
+  idempotency key since `user.created` only ever fires once per user), `lib/logging/logger.ts` (structured JSON
+  logs, always keyed by `eventId`), `lib/execution-log/repository.ts` (`insertPendingExecutionLog` via
+  `upsert(..., { onConflict: "event_id", ignoreDuplicates: true })` — no row returned means duplicate delivery;
+  `finalizeExecutionLog`), `lib/events/dispatch.ts` (`dispatchUserCreatedEvent`, with a **stubbed** `sendToN8n`
+  that always returns success — real signing/retry/fetch comes in Phase 4).
+- `POST /api/events/user-created` (the receiver Supabase's webhook calls): validates the payload shape, then
+  uses `after()` to run `dispatchUserCreatedEvent` post-response, returning `202` immediately.
+- `POST /api/users` (stand-in for a real signup flow — inserting a row here is what fires the webhook) and
+  `GET /api/execution-logs` (manual verification endpoint).
+- `/code-review` run before commit (see workflow above) surfaced 4 findings; 3 were fixed (dispatch.ts's initial
+  `insertPendingExecutionLog` and the `finalizeExecutionLog` call are now each wrapped in their own try/catch so
+  a Supabase hiccup is logged instead of becoming a silent unhandled rejection inside `after()`; the receiver
+  route now validates `payload.record.id` exists and returns `400` instead of throwing on malformed input;
+  `/api/users` returns `409` with a clean message on a duplicate email instead of leaking the raw Postgres
+  error). **Known, deliberately deferred**: `/api/events/user-created` has no verification that a request
+  actually came from Supabase (no shared-secret header configured on the Database Webhook) — anyone who
+  discovers the URL could POST a fabricated `user.created` event. Out of scope for Phase 2 per the plan (the
+  plan only calls for signing the *outbound* app→n8n call); revisit alongside Phase 6's `/security-review` pass.
+- Verified locally: `npm run build`/`lint` clean; simulated the Supabase webhook payload directly against
+  `/api/events/user-created` (Supabase can't reach `localhost`, so this is the only way to test the dispatch
+  path pre-deploy) — confirmed a `success` `execution_log` row lands, a replayed `event_id` does not create a
+  duplicate row, a malformed payload returns `400`, and a duplicate email on `POST /api/users` returns `409`.
+- Deployed to Vercel (push to `main`); **not yet verified against the real Supabase trigger** — still need to
+  `POST /api/users` against the production URL and confirm the real Database Webhook fires and an
+  `execution_log` row lands via `GET /api/execution-logs`.
 
 **Not done yet, blocking further progress:**
 1. Docker and ngrok are not installed on this machine — not needed until Phase 3, no rush.
 
-**Immediate next step**: commit Phase 1, then start **Phase 2** — receiver endpoint + execution_log write,
-n8n stubbed (per the plan doc): `lib/events/types.ts`, `lib/logging/logger.ts`, `lib/execution-log/
-repository.ts`, `lib/events/dispatch.ts` with a **stubbed** `sendToN8n`, `POST /api/events/user-created` using
-Next.js `after()`, `POST /api/users`, `GET /api/execution-logs`. Deploy and verify: insert a user row (e.g. via
-`POST /api/users`) and confirm the webhook fires and an `execution_log` row lands (the webhook will currently
-404/fail until `/api/events/user-created` exists — that's expected and is exactly what Phase 2 builds).
+**Immediate next step**: verify Phase 2 against the deployed app (`POST https://first-agentic-workflow.vercel.app/api/users`,
+then check `GET https://first-agentic-workflow.vercel.app/api/execution-logs` for the resulting row), then start
+**Phase 3** — n8n up locally + minimal echo workflow: `docker compose up` (needs Docker installed first), a
+minimal workflow (Webhook → static success), `ngrok http 5678`, then set `N8N_WEBHOOK_URL` in both
+`.env.local` and Vercel's project settings to the ngrok URL.
 
 ## Mandatory workflow: Spec → Plan → Jira tasks → Incremental implementation
 
