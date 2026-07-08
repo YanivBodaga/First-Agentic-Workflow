@@ -1,0 +1,65 @@
+{
+  "name": "user-created-echo",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "user-created",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -256,
+        -16
+      ],
+      "id": "242bedd4-3a11-4605-aaf5-996c45cc9caf",
+      "name": "Webhook",
+      "webhookId": "cd7001bf-2cd8-4d86-8109-c358aeffc3e1"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"status\": \"success\"}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        -48,
+        -16
+      ],
+      "id": "aeef5fa2-15e5-4f06-baaa-7ad95c84ccbb",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "9191d2ff-e9e1-4a0d-b32f-49a3a5b740b2",
+  "meta": {
+    "instanceId": "3eaa2819c9d9d5ebcbfc784d8a20ba870d5f4d7ed6c0e2edfe3c81a8a85f9ad6"
+  },
+  "nodeGroups": [],
+  "id": "lIXkSBf3s0bBldcW",
+  "tags": []
+}

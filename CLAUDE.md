@@ -14,7 +14,7 @@ full-stack refresher.
 The Next.js app is scaffolded (App Router, TypeScript, no Tailwind). Supabase project and n8n instance are not
 yet set up — see the phased plan in `specs/001-automation-exercise.md` and the Stack section below.
 
-## Current status / next steps (updated 2026-07-08)
+## Current status / next steps (updated 2026-07-09)
 
 Read this first when resuming work — it says exactly where things stand and what to do next.
 
@@ -81,13 +81,42 @@ Read this first when resuming work — it says exactly where things stand and wh
   Webhook → `/api/events/user-created` → `after()` dispatch → idempotent `execution_log` write) works in
   production, not just in the local simulation.
 
-**Not done yet, blocking further progress:**
-1. Docker and ngrok are not installed on this machine — not needed until Phase 3, no rush.
+**Done (Phase 3, complete):**
+- Docker Desktop installed (Windows, WSL2 backend). `n8n/docker-compose.yml` added: single `n8n` service
+  (`n8nio/n8n` image), port `5678`, `N8N_BASIC_AUTH_*` + `N8N_ENCRYPTION_KEY` sourced from `n8n/.env`
+  (git-ignored, generated values), named volume `n8n_data` for persistence. Run via `docker compose --env-file
+  n8n/.env -f n8n/docker-compose.yml up -d` (note the explicit `--env-file`: Compose's default `.env` lookup is
+  the current working directory, not the directory next to `-f`'s target).
+- n8n's own first-run owner-account setup (separate from the `N8N_BASIC_AUTH_*` instance-level gate) completed
+  in-browser at `http://localhost:5678`.
+- Minimal workflow `user-created-echo` built in the n8n UI: `Webhook` node (`POST /webhook/user-created`,
+  Respond = "Using 'Respond to Webhook' Node") → `Respond to Webhook` node (JSON `{"status": "success"}`, `200`).
+  Published (this n8n version renamed "Activate" to "Publish"). Exported and committed as
+  `n8n/workflows/user-created.json` per the plan's "manually exported snapshot after meaningful changes" policy.
+- ngrok installed via `winget install ngrok.ngrok` (the winget package was outdated — `3.3.1` fails Cloudflare's
+  minimum-agent-version check with `ERR_NGROK_121`; ran `ngrok update` to `3.39.9` to fix), authenticated with
+  the user's free-tier authtoken (`ngrok config add-authtoken`).
+- Verified: `curl -X POST http://localhost:5678/webhook/user-created` returns `{"status":"success"}` directly;
+  the same call through the ngrok tunnel (`ngrok http 5678`) also returns `{"status":"success"}`, confirming the
+  public tunnel correctly forwards to the local n8n container.
+- `N8N_WEBHOOK_URL` set to the ngrok URL + `/webhook/user-created` in both `.env.local` and Vercel's Production
+  environment. **Caveat, expected**: free-tier ngrok URLs are ephemeral — they change every time the `ngrok
+  http 5678` process restarts, so this value needs updating (both places) each time a fresh tunnel is started
+  for a new testing session (e.g. after a reboot). `sendToN8n` in `lib/events/dispatch.ts` is still the Phase 2
+  stub and does not yet actually call `N8N_WEBHOOK_URL` — that wiring happens in Phase 4.
 
-**Immediate next step**: start **Phase 3** — n8n up locally + minimal echo workflow: install Docker, `docker
-compose up` (needs `n8n/docker-compose.yml`, not created yet), a minimal workflow (Webhook → static success),
-`ngrok http 5678`, then set `N8N_WEBHOOK_URL` in both `.env.local` and Vercel's project settings to the ngrok
-URL.
+**Not done yet, blocking further progress:**
+None currently.
+
+**Immediate next step**: start **Phase 4** — replace the stubbed `sendToN8n` in `lib/events/dispatch.ts` with a
+real implementation: `lib/webhook/sign.ts` (HMAC-SHA256 over the exact raw JSON string sent, using a
+`WEBHOOK_SIGNING_SECRET` env var — not yet set in `.env.local`/Vercel, needs generating), `lib/webhook/retry.ts`
+(retry only on network error/timeout/5xx, not on a 4xx like a bad signature), and wiring `dispatch.ts` to
+actually `fetch(N8N_WEBHOOK_URL, ...)` with a 5s `AbortController` timeout and the signed headers
+(`X-Webhook-Signature`, `X-Event-Id`). Note the n8n workflow itself does not verify any signature yet (the
+`user-created-echo` workflow just echoes success unconditionally) — that verification step is Phase 5, so
+Phase 4's real-call path can be tested end-to-end (a genuine HTTP call reaching n8n through the ngrok tunnel)
+before signature checking is added on the receiving side.
 
 ## Mandatory workflow: Spec → Plan → Jira tasks → Incremental implementation
 
@@ -155,5 +184,9 @@ this repo on a plain local disk path; use git/GitHub for backup and sharing inst
 - `npm run dev` — start the local dev server
 - `npm run build` — production build (also used as a lint/type-check gate)
 - `npm run lint` — ESLint
-- `docker compose -f n8n/docker-compose.yml up` — start local n8n (added in Phase 3)
-- `ngrok http 5678` — expose local n8n publicly for the Vercel-deployed app to reach (Phase 3+)
+- `docker compose --env-file n8n/.env -f n8n/docker-compose.yml up -d` — start local n8n (added in Phase 3;
+  the explicit `--env-file` matters — Compose's default `.env` lookup is the current working directory, not
+  the directory next to `-f`'s target)
+- `ngrok http 5678` — expose local n8n publicly for the Vercel-deployed app to reach (Phase 3+); copy the
+  printed `https://*.ngrok-free.dev` URL + `/webhook/user-created` into `N8N_WEBHOOK_URL` in both `.env.local`
+  and Vercel's Production env vars (free-tier URL changes every restart)
