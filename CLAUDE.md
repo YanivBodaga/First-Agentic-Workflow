@@ -74,18 +74,20 @@ Read this first when resuming work — it says exactly where things stand and wh
   `/api/events/user-created` (Supabase can't reach `localhost`, so this is the only way to test the dispatch
   path pre-deploy) — confirmed a `success` `execution_log` row lands, a replayed `event_id` does not create a
   duplicate row, a malformed payload returns `400`, and a duplicate email on `POST /api/users` returns `409`.
-- Deployed to Vercel (push to `main`); **not yet verified against the real Supabase trigger** — still need to
-  `POST /api/users` against the production URL and confirm the real Database Webhook fires and an
-  `execution_log` row lands via `GET /api/execution-logs`.
+- Deployed to Vercel (push to `main`, commit `dc3b5f5`) and **verified against the real Supabase trigger**:
+  `POST https://first-agentic-workflow.vercel.app/api/users` with a fresh email, then `GET
+  https://first-agentic-workflow.vercel.app/api/execution-logs` showed a matching `event_id` (the new user's
+  row `id`) with `status: "success"` — confirming the full real chain (Postgres insert → Supabase Database
+  Webhook → `/api/events/user-created` → `after()` dispatch → idempotent `execution_log` write) works in
+  production, not just in the local simulation.
 
 **Not done yet, blocking further progress:**
 1. Docker and ngrok are not installed on this machine — not needed until Phase 3, no rush.
 
-**Immediate next step**: verify Phase 2 against the deployed app (`POST https://first-agentic-workflow.vercel.app/api/users`,
-then check `GET https://first-agentic-workflow.vercel.app/api/execution-logs` for the resulting row), then start
-**Phase 3** — n8n up locally + minimal echo workflow: `docker compose up` (needs Docker installed first), a
-minimal workflow (Webhook → static success), `ngrok http 5678`, then set `N8N_WEBHOOK_URL` in both
-`.env.local` and Vercel's project settings to the ngrok URL.
+**Immediate next step**: start **Phase 3** — n8n up locally + minimal echo workflow: install Docker, `docker
+compose up` (needs `n8n/docker-compose.yml`, not created yet), a minimal workflow (Webhook → static success),
+`ngrok http 5678`, then set `N8N_WEBHOOK_URL` in both `.env.local` and Vercel's project settings to the ngrok
+URL.
 
 ## Mandatory workflow: Spec → Plan → Jira tasks → Incremental implementation
 
